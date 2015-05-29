@@ -203,3 +203,44 @@ void get_ipinfo_llepjettv(TransientTrack ttrk, TransientVertex tv, GlobalVector 
   sip2Dsig_err = currIP.second.error();
  }
 }
+/////Get the IP info of the tracks
+//Get the 3D IP value, sig, signedIP 
+void IPToolsValues3D(const TransientTrack ttrk, const reco::Vertex vtx, GlobalVector gv3D, double& trk_IP3D_val,double& trk_IP3D_sig, double& trk_sIP3D_val,double& trk_sIP3D_sig, double& trk_IP3D_err, double& trk_sIP3D_err){
+ //3D
+ trk_IP3D_val = IPTools::absoluteImpactParameter3D(ttrk,vtx).second.value();
+ trk_IP3D_err = IPTools::absoluteImpactParameter3D(ttrk,vtx).second.error();
+ trk_IP3D_sig = IPTools::absoluteImpactParameter3D(ttrk,vtx).second.significance();
+ //s3D
+ trk_sIP3D_val = IPTools::signedImpactParameter3D(ttrk,gv3D,vtx).second.value();
+ trk_sIP3D_err = IPTools::signedImpactParameter3D(ttrk,gv3D,vtx).second.error();
+ trk_sIP3D_sig = IPTools::signedImpactParameter3D(ttrk,gv3D,vtx).second.significance();
+}
+//Get the 2DIP value, sig, signedIP
+void IPToolsValues2D(const TransientTrack ttrk, const reco::Vertex vtx, GlobalVector gv2D,double& trk_IP2D_val,double& trk_IP2D_sig,double& trk_sIP2D_val,double& trk_sIP2D_sig,double& trk_IP2D_err,double& trk_sIP2D_err){
+ //2D
+ trk_IP2D_val = IPTools::absoluteTransverseImpactParameter(ttrk,vtx).second.value();
+ trk_IP2D_err = IPTools::absoluteTransverseImpactParameter(ttrk,vtx).second.error();
+ trk_IP2D_sig = IPTools::absoluteTransverseImpactParameter(ttrk,vtx).second.significance();
+ //s2D
+ trk_sIP2D_val = IPTools::signedTransverseImpactParameter(ttrk,gv2D,vtx).second.value();
+ trk_sIP2D_err = IPTools::signedTransverseImpactParameter(ttrk,gv2D,vtx).second.error();
+ trk_sIP2D_sig = IPTools::signedTransverseImpactParameter(ttrk,gv2D,vtx).second.significance();
+}
+//Get the 1DIP value, sig, signedIP
+void IPToolsValues1D(const TransientTrack ttrk, const reco::Vertex vtx, GlobalVector gv, double& trk_IP1D_val,double& trk_IP1D_sig, double& trk_sIP1D_val,double& trk_sIP1D_sig,double& trk_IP1D_err, double& trk_sIP1D_err){ 
+ GlobalPoint vert(vtx.position().x(), vtx.position().y(), vtx.position().z());
+ TrajectoryStateClosestToPoint traj = ttrk.trajectoryStateClosestToPoint(vert);
+ trk_IP1D_val = fabs(traj.perigeeParameters().longitudinalImpactParameter());
+ trk_IP1D_err = traj.perigeeError().longitudinalImpactParameterError();
+ trk_IP1D_sig = trk_IP1D_val/trk_IP1D_err;
+ //Get the Sign
+ AnalyticalImpactPointExtrapolator extrapolator(ttrk.field());
+ TrajectoryStateOnSurface closestIn3DSpaceState = extrapolator.extrapolate(ttrk.impactPointState(),vert);
+ GlobalPoint impactPoint = closestIn3DSpaceState.globalPosition();
+ GlobalVector IPVec(0,0,impactPoint.z()-vtx.position().z());
+ double prod   = IPVec.dot(gv);
+ double sign   = (prod>=0) ? 1. : -1.;
+ trk_sIP1D_val = sign*trk_IP1D_val;
+ trk_sIP1D_err = sign*trk_IP1D_err;
+ trk_sIP1D_sig = sign*trk_IP1D_sig;
+}

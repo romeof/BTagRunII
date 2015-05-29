@@ -33,17 +33,17 @@ using namespace std;
 //   Declare constants
 /////
 const string path     = "/afs/cern.ch/work/s/sshaheen/CMSSW_7_2_3/src/BTagRunII/BTagReco/macros_panga/";
-const char *samples[] = {"bak_nocsv_sub","sgnl_nocsv_sub"};
+//const char *samples[] = {"ttjets_sgnl", "ttjets_bak"};
+const char *samples[] = {"bak_IP_signed","sgnl_IP_signed"};
 const string selection = "";
 const int numvar       = 100;
 //Variables
-const char *varfirst[]        = {"jet_numno2v","jet_csv","jet_chi2tot"};
-const char *varsecond[]       = {"jet_num2vno2v","1","jet_chi2ndf"}
-const char *vartitle[]        = {"#2tV", "jet_csv","#chi^{2}/ndf"};
-const double cutIni[numvar]  = {0,0,0,0,0,0};
-const double cutFin[numvar]  = {1,1,1000,1,1,1};
-const int    npoints[numvar] = {100,100,100,100,100,100};
-const string namefile        = "ROC_jetrks_numno2v.pdf";
+const char *varfirst[]        = {"jet_csv","trk_sIP3D_val[1]","trk_sIP2D_val[1]","trk_sIP1D_val[1]"};
+const char *varsecond[]       = {"1","1","1","1","1","1","1"}
+const char *vartitle[]        = {"jet_csv","sIP3D_val", "sIP2D_val","sIP1D_val","sIP2D_val"}; onst double cutIni[numvar]  = {0,-1,-1,-1,0,0};
+const double cutFin[numvar]   = {1,1,1,1,1,1};
+const int    npoints[numvar]  = {100,100,100,100,100,100};
+const string namefile         = "plots/ROC_sIP_val_track2.pdf";
 /////
 //   Declare functions 
 /////

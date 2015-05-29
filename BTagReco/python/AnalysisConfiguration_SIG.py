@@ -48,7 +48,7 @@ process.source = cms.Source("PoolSource",
  #skipEvents = cms.untracked.uint32(25) #Skip the first n evt, or comment this line if you do not want to skip evt
 ),
 )
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(30000) ) #Num of evt to be analysed (whatever is the starting evt)
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(30) ) #Num of evt to be analysed (whatever is the starting evt)
 #####
 ##   Output file
 #####

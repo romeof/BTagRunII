@@ -79,6 +79,10 @@
 #include "TrackingTools/IPTools/interface/IPTools.h"
 //Math
 #include "DataFormats/Math/interface/deltaR.h"
+//Track extrapolator
+#include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
+#include "TrackingTools/GeomPropagators/interface/AnalyticalImpactPointExtrapolator.h"
+#include "TrackingTools/GeomPropagators/interface/AnalyticalTrajectoryExtrapolatorToLine.h"
 //Store info
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
@@ -257,9 +261,9 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
   tightleps.push_back((const reco::Candidate*)&ele);
  }
  int lep_numl = looseleps.size();
-// tree->lep_numl = lep_numl;
+ //tree->lep_numl = lep_numl;
  int lep_numt = tightleps.size();
-// tree->lep_numt = lep_numt;
+ //tree->lep_numt = lep_numt;
  if(lep_numl>1) tree->lep_dichprodl = looseleps[0]->charge()*looseleps[1]->charge();
  if(lep_numt>1) tree->lep_dichprodt = tightleps[0]->charge()*tightleps[1]->charge();
  //Jets
@@ -293,8 +297,7 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  tree->lep_numt      = lep_numt;
  tree->jet_num       = jet_num;
  tree->partonFlavour = j.partonFlavour();
-  
-/////
+ /////
  //   Take relevant info only for the first jet 
  /////
  //kinematic
@@ -302,8 +305,6 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  tree->jet_eta = j.eta();
  tree->jet_phi = j.phi();
  tree->jet_en  = j.energy();
- //Geometry
- GlobalVector jetgv(j.px(),j.py(),j.pz());
  //B tag prop
  double jet_csv_double = j.bDiscriminator("combinedInclusiveSecondaryVertexV2BJetTags");
  tree->jet_csv = jet_csv_double;
@@ -323,7 +324,7 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  tree->jet_chtrksnpv   = jet_chtrksnpv_int;
  tree->jet_chtrkspvtt  = jet_chtrkspvtt_int;
  tree->jet_chtrksnpvtt = jet_chtrksnpvtt_int;
- //Vertex compatibility 
+ /////Vertex compatibility 
  //chi2
  double jet_chi2tot_double  = -999;
  double jet_chi2ndf_double  = -1;
@@ -343,9 +344,120 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  tree->jet_num2v       = jet_num2v_double;
  tree->jet_numno2v     = jet_numno2v_double;
  tree->jet_num2vno2v   = jet_num2v_double+jet_numno2v_double;
- //Jet vertices
- //TransientVertex jetchtrkspv = get_tv(jetchtrks,*ttrkbuilder); 
- //TransientVertex jetchtrksnpvpv = get_tv(jetchtrksnpv,*ttrkbuilder);
+ ////Get the track IP info
+ //Variables
+ int track_3D_pos = 0;
+ int track_2D_pos = 0;
+ int track_1D_pos = 0;
+ int track_num    = 0; 
+ vector<pair<double,int> > trk_3D_IP;
+ vector<pair<double, int>> trk_2D_IP;
+ vector<pair<double, int>> trk_1D_IP;
+ //Take the reco direction
+ //GlobalVector gv3D(j.px(),j.py(),j.pz());
+ //GlobalVector gv2D(j.px(),j.py(),0);
+ //GlobalVector gv1D(0,0,j.pz());
+ //Take the gen direction (from parton)
+ const reco::GenParticle * jet_genparton = j.genParton(); 
+ GlobalVector gv3D(jet_genparton->px(),jet_genparton->py(),jet_genparton->pz());
+ GlobalVector gv2D(jet_genparton->px(),jet_genparton->py(),0);
+ GlobalVector gv1D(0,0,jet_genparton->pz());
+ //Take the gen direction (from jet)
+ //const reco::GenJet * jet_genjet = j.genJet();
+ //GlobalVector gv3D(jet_genjet->px(),jet_genjet->py(),jet_genjet->pz());
+ //GlobalVector gv2D(jet_genjet->px(),jet_genjet->py(),0);
+ //GlobalVector gv1D(0,0,jet_genjet->pz());
+
+
+ double trk_IP3D_val  = -999;
+ double trk_IP3D_sig  = -999;
+ double trk_IP2D_val  = -999;
+ double trk_IP2D_sig  = -999;
+ double trk_sIP3D_val = -999;
+ double trk_sIP3D_sig = -999;
+ double trk_sIP2D_val = -999;
+ double trk_sIP2D_sig = -999;
+ double trk_IP1D_val  = -999;
+ double trk_IP1D_sig  = -999;
+ double trk_sIP1D_val = -999;
+ double trk_sIP1D_sig = -999;
+ double trk_IP3D_err  = -999;
+ double trk_sIP3D_err = -999;
+ double trk_IP2D_err  = -999;
+ double trk_sIP2D_err = -999;
+ double trk_IP1D_err  = -999;
+ double trk_sIP1D_err = -999;
+ //Get track 3D info
+ for(uint i=0;i<jetchtrks.size();i++)
+ {
+  Track trk            = jetchtrks[i];
+  TransientTrack ttrk  = ttrkbuilder->build(&trk);
+  IPToolsValues3D(ttrk,PV,gv3D,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err,trk_sIP3D_err);
+  trk_3D_IP.push_back(make_pair(trk_IP3D_val,track_3D_pos)); 
+  track_3D_pos++;
+  track_num++;
+ }
+ if(track_num==0) return;
+ sort(trk_3D_IP.rbegin(), trk_3D_IP.rend());
+ for(uint k=0;k<jetchtrks.size();k++)
+ {
+  int track3D           = trk_3D_IP[k].second;
+  Track trk3D           = jetchtrks[track3D];
+  TransientTrack ttrk3D = ttrkbuilder->build(&trk3D);
+  IPToolsValues3D(ttrk3D,PV,gv3D,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err,trk_sIP3D_err);
+  tree->trk_IP3D_val[k]  = trk_IP3D_val;
+  tree->trk_IP3D_sig[k]  = trk_IP3D_sig;
+  tree->trk_IP3D_err[k]  = trk_IP3D_err;
+  tree->trk_sIP3D_val[k] = trk_sIP3D_val;
+  tree->trk_sIP3D_sig[k] = trk_sIP3D_sig;
+  tree->trk_sIP3D_err[k] = trk_sIP3D_err;
+ } 
+ //Get track 2D info 
+ for(uint i=0;i<jetchtrks.size();i++)
+ {
+  Track trk2D            = jetchtrks[i];
+  TransientTrack ttrk2D  = ttrkbuilder->build(&trk2D);
+  IPToolsValues2D(ttrk2D,PV,gv2D,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig,trk_IP2D_err,trk_sIP2D_err);
+  trk_2D_IP.push_back(make_pair(trk_IP2D_val,track_2D_pos));
+  track_2D_pos++;
+ }
+ sort(trk_2D_IP.rbegin(),trk_2D_IP.rend());
+ for(uint k=0;k<jetchtrks.size();k++)
+ {
+  int track2D           = trk_2D_IP[k].second;
+  Track trk2D           = jetchtrks[track2D];
+  TransientTrack ttrk2D = ttrkbuilder->build(&trk2D);
+  IPToolsValues2D(ttrk2D,PV,gv2D,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig, trk_IP2D_err, trk_sIP2D_err);
+  tree->trk_IP2D_val[k]  = trk_IP2D_val;
+  tree->trk_IP2D_sig[k]  = trk_IP2D_sig;
+  tree->trk_IP2D_err[k]  = trk_IP2D_err;
+  tree->trk_sIP2D_val[k] = trk_sIP2D_val;
+  tree->trk_sIP2D_sig[k] = trk_sIP2D_sig;
+  tree->trk_sIP2D_err[k] = trk_sIP2D_err;
+ }
+ //Get track 1D info 
+ for(uint i=0;i<jetchtrks.size();i++)
+ {
+  Track trk1D            = jetchtrks[i];
+  TransientTrack ttrk1D  = ttrkbuilder->build(&trk1D);
+  IPToolsValues1D(ttrk1D,PV,gv1D,trk_IP1D_val,trk_IP1D_sig,trk_sIP1D_val,trk_sIP1D_sig, trk_IP1D_err, trk_sIP1D_err);
+  trk_1D_IP.push_back(make_pair(trk_IP1D_val,track_1D_pos));
+  track_1D_pos++;
+ }
+ sort(trk_1D_IP.rbegin(),trk_1D_IP.rend());
+ for(uint k=0;k<jetchtrks.size();k++)
+ {
+  int track1D           = trk_1D_IP[k].second;
+  Track trk1D           = jetchtrks[track1D];
+  TransientTrack ttrk1D = ttrkbuilder->build(&trk1D);
+  IPToolsValues1D(ttrk1D,PV,gv1D,trk_IP1D_val,trk_IP1D_sig,trk_sIP1D_val,trk_sIP1D_sig, trk_IP1D_err, trk_sIP1D_err);
+  tree->trk_IP1D_val[k]  = trk_IP1D_val;
+  tree->trk_IP1D_sig[k]  = trk_IP1D_sig;
+  tree->trk_IP1D_err[k]  = trk_IP1D_err;
+  tree->trk_sIP1D_val[k] = trk_sIP1D_val;
+  tree->trk_sIP1D_sig[k] = trk_sIP1D_sig;
+  tree->trk_sIP1D_err[k] = trk_sIP1D_err;
+ }
  /////
  //   Fill tree
  /////

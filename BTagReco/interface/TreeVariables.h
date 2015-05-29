@@ -66,6 +66,8 @@ public:
  double jet_num2v, jet_numno2v, jet_num2vno2v, jet_dca3d2t, jet_dca3dno2t, jet_dca3d2tno2t, jet_dca2d2t, jet_dca2dno2t, jet_dca2d2tno2t;
  //Primary Vertex Info
  double PVxpvx, PVypvy, PVzpvz;
+ // Get the IP info of the Jet tracks
+ double trk_IP3D_val[DEF_SIZE1D], trk_IP3D_sig[DEF_SIZE1D], trk_IP2D_val[DEF_SIZE1D], trk_IP2D_sig[DEF_SIZE1D], trk_IP1D_val[DEF_SIZE1D],trk_IP1D_sig[DEF_SIZE1D], trk_sIP3D_val[DEF_SIZE1D], trk_sIP3D_sig[DEF_SIZE1D], trk_sIP2D_val[DEF_SIZE1D], trk_sIP2D_sig[DEF_SIZE1D],trk_sIP1D_val[DEF_SIZE1D], trk_sIP1D_sig[DEF_SIZE1D], trk_IP3D_err[DEF_SIZE1D], trk_sIP3D_err[DEF_SIZE1D], trk_IP2D_err[DEF_SIZE1D], trk_sIP2D_err[DEF_SIZE1D],trk_IP1D_err[DEF_SIZE1D],trk_sIP1D_err[DEF_SIZE1D];
  /////
  ////   Initialise
  ///////
@@ -111,6 +113,25 @@ public:
   PVxpvx = -9999.;
   PVypvy = -9999.;
   PVzpvz = -9999.;
+ // Get the IP info of the Jet Tracks
+  INIT_1DARRAY(trk_IP3D_val,DEF_SIZE1D,DEF_VAL_DOUBLE); 
+  INIT_1DARRAY(trk_IP3D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP2D_val,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP2D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP1D_val,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP1D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP3D_val,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP3D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP2D_val,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP2D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP1D_val,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP1D_sig,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP3D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP3D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP2D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP2D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_IP1D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
+  INIT_1DARRAY(trk_sIP1D_err,DEF_SIZE1D,DEF_VAL_DOUBLE);
  } 
  /////
  //   Set branches
@@ -159,6 +180,25 @@ public:
   tree->Branch("PVxpvx",&PVxpvx,"PVxpvx/D");
   tree->Branch("PVypvy",&PVypvy,"PVypvy/D");
   tree->Branch("PVzpvz",&PVzpvz,"PVzpvz/D");
+  //Get the IP info of the tracks
+  tree->Branch("trk_IP3D_val", &trk_IP3D_val, "trk_IP3D_val[jet_num]/D");
+  tree->Branch("trk_IP3D_sig", &trk_IP3D_sig, "trk_IP3D_sig[jet_num]/D");
+  tree->Branch("trk_IP2D_val", &trk_IP2D_val, "trk_IP2D_val[jet_num]/D");
+  tree->Branch("trk_IP2D_sig", &trk_IP2D_sig, "trk_IP2D_sig[jet_num]/D");
+  tree->Branch("trk_IP1D_val", &trk_IP1D_val, "trk_IP1D_val[jet_num]/D");
+  tree->Branch("trk_IP1D_sig", &trk_IP1D_sig, "trk_IP1D_sig[jet_num]/D");
+  tree->Branch("trk_sIP3D_val", &trk_sIP3D_val, "trk_sIP3D_val[jet_num]/D");
+  tree->Branch("trk_sIP3D_sig", &trk_sIP3D_sig, "trk_sIP3D_sig[jet_num]/D");
+  tree->Branch("trk_sIP2D_val", &trk_sIP2D_val, "trk_sIP2D_val[jet_num]/D");
+  tree->Branch("trk_sIP2D_sig", &trk_sIP2D_sig, "trk_sIP2D_sig[jet_num]/D");
+  tree->Branch("trk_sIP1D_val", &trk_sIP1D_val, "trk_sIP1D_val[jet_num]/D");
+  tree->Branch("trk_sIP1D_sig", &trk_sIP1D_sig, "trk_sIP1D_sig[jet_num]/D");
+  tree->Branch("trk_IP3D_err", &trk_IP3D_err, "trk_IP3D_err[jet_num]/D");
+  tree->Branch("trk_sIP3D_err", &trk_sIP3D_err, "trk_sIP3D_err[jet_num]/D");
+  tree->Branch("trk_IP2D_err", &trk_IP2D_err, "trk_IP2D_err[jet_num]/D"); 
+  tree->Branch("trk_sIP2D_err", &trk_sIP2D_err, "trk_sIP2D_err[jet_num]/D");
+  tree->Branch("trk_IP1D_err", &trk_IP1D_err, "trk_IP1D_err[jet_num]/D");
+  tree->Branch("trk_sIP1D_err", &trk_sIP1D_err, "trk_sIP1D_err[jet_num]/D");
 }
  /////
  //   Set branch address
@@ -208,7 +248,25 @@ public:
   tree->SetBranchAddress("PVxpvx", &PVxpvx);
   tree->SetBranchAddress("PVypvy", &PVypvy);
   tree->SetBranchAddress("PVzpvz", &PVzpvz);
-   
+  //Get the IP info of the Jet Tracks
+  tree->SetBranchAddress("trk_IP3D_val",trk_IP3D_val);
+  tree->SetBranchAddress("trk_IP3D_sig",trk_IP3D_sig);
+  tree->SetBranchAddress("trk_IP2D_val",trk_IP2D_val);
+  tree->SetBranchAddress("trk_IP2D_sig",trk_IP2D_sig);
+  tree->SetBranchAddress("trk_IP1D_val",trk_IP1D_val);
+  tree->SetBranchAddress("trk_IP1D_sig",trk_IP1D_sig);
+  tree->SetBranchAddress("trk_sIP3D_val",trk_sIP3D_val);
+  tree->SetBranchAddress("trk_sIP3D_sig",trk_sIP3D_sig);
+  tree->SetBranchAddress("trk_sIP2D_val",trk_sIP2D_val);
+  tree->SetBranchAddress("trk_sIP2D_sig",trk_sIP2D_sig);
+  tree->SetBranchAddress("trk_sIP1D_val",trk_sIP1D_val);
+  tree->SetBranchAddress("trk_sIP1D_sig",trk_sIP1D_sig);
+  tree->SetBranchAddress("trk_IP3D_err",trk_IP3D_err);
+  tree->SetBranchAddress("trk_sIP3D_err",trk_sIP3D_err);
+  tree->SetBranchAddress("trk_IP2D_err",trk_IP2D_err);
+  tree->SetBranchAddress("trk_sIP2D_err",trk_sIP2D_err);
+  tree->SetBranchAddress("trk_IP1D_err",trk_IP1D_err);
+  tree->SetBranchAddress("trk_sIP1D_err",trk_sIP1D_err);
  }
 };
 #endif
