@@ -33,23 +33,27 @@ using namespace std;
 //   Declare constants
 /////
 const string path     = "/afs/cern.ch/work/s/sshaheen/CMSSW_7_2_3/src/BTagRunII/BTagReco/macros_panga/";
-const char *samples[] = {"sgnl_IP_signed", "bak_IP_signed"};
+const char *samples[] = { "sig_RVnew_","bak_RVnew_","charm_RVnew_"};
 const string selection  = "";
 const int numvar        = 100;
 //declare variables to draw
 
-const char *varfirst[]        = {"trk_IP3D_sig","trk_IP3D_sig","trk_IP3D_sig"};
-const char *varsecond[]       = {"1","1","1"};
-const char *vartitle[]        = {"IP3D sig track1","IP3D sig track2","IP3D sig track3"};
-const double inRange[numvar]  = {0,0,0};
-const double endRange[numvar] = {65,41,41};
-const int    bin[numvar]      = {100,100,100};
-bool ylogscale    = true;
-double setminimum = 0.01;
-double setmaximum = 100;
-double overflow1[numvar]={60,40,40};
-double overflowR=1;
-
+//const char *varfirst[]        = {"diff_PVx_RVx_kvf","diff_PVy_RVy_kvf","diff_PVz_RVz_kvf","diff_PVx_RVx_kvf_bs","diff_PVy_RVy_kvf_bs","diff_PVz_RVz_kvf_bs","diff_PVx_RVx_avf","diff_PVy_RVy_avf","diff_PVz_RVz_avf","diff_PVx_RVx_avf_bs","diff_PVy_RVy_avf_bs","diff_PVz_RVz_avf_bs"};
+//const char *varfirst[]        = {"PVz","PVz","PVz","PVz","PVz","PVz","PVz","PVz"};
+//const char *varsecond[]       = {"RV_z","RV_kvf_bs_3D","RV_avf_3D","RV_avf_bs_3D","RV_z","RV_kvf_bs_3D","RV_avf_3D","RV_avf_bs_3D"};
+const char *varfirst[]          = {"diff_chi2_ndf_RV_addjettrks_RVnob"};
+const char *varsecond[]         = {"1","diff_chi2_ndf_RV_addjettrks_RVnob","1","PVx","PVy","PVz"};
+//const char *vartitle[]        = {"(diff_PVx_RVx_kvf)/PVx","(diff_PVy_RVy_kvf)/PVy","(diff_PVz_RVz_kvf)/PVz","(diff_PVx_RVx_kvf_bs)/PVx","(diff_PVy_RVy_kvf_bs)/PVy","(diff_PVz_RVz_kvf_bs)/PVz","(diff_PVx_RVx_avf)/PVx","(diff_PVy_RVy_avf)/PVy","(diff_PVz_RVz_avf)/PVz","(diff_PVx_RVx_avf_bs)/PVx","(diff_PVy_RVy_avf_bs)/PVy","(diff_PVz_RVz_avf_bs)/PVz"};
+const char *vartitle[]        = {"#chi^{2}/ndf_RVaddjtrk_RVnojet","#chi^{2}/ndf(RV-RVaddjtrck)","diff_RV_RVnob_z","(diff_RV_RVnob_x)/PV_x","(diff_RV_RVnob_y)/PV_y","(diff_RV_RVnob_z/PV_z)"};
+const double inRange[numvar]  = {-5,-100,-100,-0.1,-0.1,-0.1,-0.1,-0.1,-0.02,-0.02,-0.02,-0.02};
+const double endRange[numvar] = {7,100,100,0.1,0.1,0.1,0.1,0.1,0.1,0.02,0.02,0.02,};
+const int    bin[numvar]      = {100,100,100,100,100,100,100,100,100,100,100,100};
+double ylogscale[numvar]      = {1,1,1,1,1,1,1,1,1,1,1,1};
+double setminimum[numvar]     = {0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01};
+double setmaximum[numvar]     = {100,100,100,100,100,100,100,100,100,100,100,100};
+double overflow[numvar]       = {5,500,1000,500,500,1000,500,500,1000,500,500,1000};
+double overflow1[numvar]      = {5,500,1000,500,500,1000,500,500,1000,500,500,1000};
+double overflowl[numvar]      = {-500,-500,-1000,-500,-500,-1000,-500,-500,-1000,-500,-500,-1000};
 //0ther options
 bool saveplots = true;
 
@@ -76,13 +80,14 @@ void SigBkgVarsOverlaid(){
  //for(uint vars=0; vars<1; vars++)
  {
   TCanvas* c1 = new TCanvas(vartitles[vars].c_str(),vartitles[vars].c_str(),200,200,800,600);
-  if(ylogscale) c1->SetLogy();
+cout<<"the variable is"<<varfirsts[vars]<<endl; 
+ if(ylogscale[vars]==1) c1->SetLogy();
   TLegend *leg = new TLegend(0.7, 0.7, 0.9, 0.9);
   //jet_csv //TLegend *leg = new TLegend(0.5, 0.7, 0.7, 0.9);
   leg->SetHeader("Samples");
   leg->SetBorderSize(0);
   leg->SetFillStyle(0);
-  leg->SetTextSize(0.03);
+  leg->SetTextSize(0.05);
   //leg->SetTextSize(0.035);
   //Do plots
   //Loop over samples
@@ -103,38 +108,58 @@ void SigBkgVarsOverlaid(){
     hist->SetMarkerColor(kBlue);
     hist->SetLineColor(kBlue);
    }
+   else{
+    hist->SetMarkerColor(kGreen);
+    hist->SetLineColor(kGreen);
+    }
    //Make plot
    TFile* f = Call_TFile((rootplas[smp]).c_str()); TTree* tree; f->GetObject("tree",tree);
-   const int arraycomp = 10;
-   double first[arraycomp];
-   double second[arraycomp];
+   //int arraysize=100;
+   double first;
+   double second;
    double ratio=0;
-   //double me=0;
+   //double first[arraycomp];
+   int a=0;
    tree->SetBranchAddress(varfirsts[vars].c_str(),&first); 
    tree->SetBranchAddress(varseconds[vars].c_str(),&second); 
    for(int en=0; en<tree->GetEntries(); en++)
-   //for(int en=0; en<100000; en++)
+    
+   //cout<<"the panga is"<<first[vars]<<endl;
+   //for(int en=0; en<25; en++)
    {
     tree->GetEntry(en);
-    if(first[vars]==-999) continue;
+    if(first==-9999) continue;
     if(varseconds[vars]=="1") 
     {
-    if(first[vars]>overflow1[vars])
-    {
-     first[vars]=overflow1[vars];
-    } 
-     hist->Fill(first[vars]);
-    }  
-    if(varseconds[vars]!="1") 
-    {
-     ratio=first[vars]/second[vars];
-    if(ratio>overflowR) 
-    {
-     ratio=overflowR;
+    if(first>overflow1[vars]) first=overflow1[vars];
+    if(first<overflowl[vars]) first=overflowl[vars];
+     //hist->Fill(first[vars]);
+    hist->Fill(first);  
     }
-    hist->Fill(ratio);  
-    }
+    //if(vars<=3){
+    if(varseconds[vars]!="1"){
+    if(vars<=2){
+    ratio=first-second;
+   //Overflow the last bin
+    if(ratio>overflow[vars]) 
+   {
+   ratio=overflow[vars];
    }
+   }else{
+   ratio=first/second;
+   //cout<<"It should not work "<<endl;
+   if(ratio>overflow[vars]) ratio=overflow[vars];
+   //cout<<"vars";
+   }
+   //ratio= numerator/denominator;
+   
+   //if(ratio>overflow[vars]) ratio=overflow[vars];
+   //cout<<"the ratio is "<<ratio<<endl;
+    hist->Fill(ratio); 
+   } 
+    }
+  // }
+   cout<<"the entries with -999 values are"<<a<<endl;
    cout<<"Entries of "<<rootplas[smp]<<" is "<<hist->Integral()<<endl;
    double scale = hist->Integral();
    hist->Scale(1/scale*100);
@@ -142,34 +167,43 @@ void SigBkgVarsOverlaid(){
    gStyle->SetOptStat("mr");     
    gStyle->SetStatColor(kWhite);
    gStyle->SetStatX(0.9); //Starting position on X axis
-   gStyle->SetStatW(0.2); //Horizontal size 
+   gStyle->SetStatW(0.3); //Horizontal size 
    //jet_csv
    //gStyle->SetStatX(0.7); //Starting position on X axis
    //gStyle->SetStatW(0.2); //Horizontal size 
    if(smp==0){
     gStyle->SetStatTextColor(kRed);
     gStyle->SetStatY(0.7); //Starting position on Y axis
-    gStyle->SetStatFontSize(0.1); //Vertical Size
+    gStyle->SetStatFontSize(0.2); //Vertical Size
    }else if(smp==1){
     gStyle->SetStatTextColor(kBlue);
     gStyle->SetStatY(0.5); //Starting position on Y axis
-    gStyle->SetStatFontSize(0.1); //Vertical Size
-   }
+    gStyle->SetStatFontSize(0.2); //Vertical Size
+   } else{
+    gStyle->SetStatTextColor(kGreen);
+    gStyle->SetStatY(0.3); //Starting position on Y axis
+    gStyle->SetStatFontSize(0.2); //Vertical Size
+    }
    if(smp==0){
     leg->AddEntry(hist,"b jet","L"); 
-    hist->SetMinimum(setminimum);
-    hist->SetMaximum(setmaximum);
+    hist->SetMinimum(setminimum[vars]);
+    hist->SetMaximum(setmaximum[vars]);
     hist->Draw(""); 
-   }else{
+   }else if(smp==1){
     leg->AddEntry(hist,"light Flavor jets","L"); 
-    hist->SetMinimum(setminimum);
-    hist->SetMaximum(setmaximum);
+    hist->SetMinimum(setminimum[vars]);
+    hist->SetMaximum(setmaximum[vars]);
+    hist->Draw("sames");
+   }else{
+   leg->AddEntry(hist,"c jets","L");
+    hist->SetMinimum(setminimum[vars]);
+    hist->SetMaximum(setmaximum[vars]);
     hist->Draw("sames");
    }
   } 
   leg->Draw();
   string num = convertToString(double(vars));
-  string namefile = "plots/"+varfirsts[vars]+"_"+num+".pdf";;
+  string namefile = "plots_RPVnojet/"+varfirsts[vars]+"_"+num+".pdf";
   if(saveplots) c1->SaveAs(namefile.c_str());
  }
 }

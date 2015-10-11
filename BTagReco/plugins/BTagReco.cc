@@ -77,6 +77,8 @@
 #include "TrackingTools/PatternTools/interface/TwoTrackMinimumDistance.h"
 #include "RecoVertex/KinematicFitPrimitives/interface/KinematicParticleFactoryFromTransientTrack.h"
 #include "TrackingTools/IPTools/interface/IPTools.h"
+#include "RecoVertex/AdaptiveVertexFit/interface/AdaptiveVertexFitter.h"
+#include "RecoBTag/SecondaryVertex/interface/SecondaryVertex.h"
 //Math
 #include "DataFormats/Math/interface/deltaR.h"
 //Track extrapolator
@@ -137,6 +139,7 @@ class BTagReco : public edm::EDAnalyzer {
  const double mindr_p5;
  const bool   first_jet_highest_btag;
  const bool   first_jet_lowest_btag;
+ const bool   first_jet_highest_ctag;
  //Watch time and cpu for the analysis
  TStopwatch* stopwatch;
  //Tree
@@ -144,7 +147,7 @@ class BTagReco : public edm::EDAnalyzer {
  const edm::Service<TFileService> fs;
 };
 /////
-//   Constructors and destructor
+//   Constructor and destructor
 /////
 BTagReco::BTagReco(const edm::ParameterSet& iConfig):
  //Collections of objects
@@ -168,6 +171,7 @@ BTagReco::BTagReco(const edm::ParameterSet& iConfig):
  mindr_p5(iConfig.getUntrackedParameter<double>("mindr_p5")),
  first_jet_highest_btag(iConfig.getParameter<bool>("first_jet_highest_btag")),
  first_jet_lowest_btag(iConfig.getParameter<bool>("first_jet_lowest_btag")),
+ first_jet_highest_ctag(iConfig.getParameter<bool>("first_jet_highest_ctag")),
  //TTree 
  tree(new CTree(fs->make<TTree>("tree", "tree")))   
 {
@@ -175,11 +179,10 @@ BTagReco::BTagReco(const edm::ParameterSet& iConfig):
  tree->make_branches();
  stopwatch = new TStopwatch();
 }
-
 BTagReco::~BTagReco()
 {
- // do anything here that needs to be done at desctruction time
- // (e.g. close files, deallocate resources etc.)
+ //do anything here that needs to be done at desctruction time
+ //(e.g. close files, deallocate resources etc.)
  delete stopwatch;
 }
 /////
@@ -228,7 +231,8 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  iEvent.getByToken(lostTracksToken_, lostrks);
  edm::ESHandle<TransientTrackBuilder> ttrkbuilder;
  iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder",ttrkbuilder);
- KalmanVertexFitter vtxFitter(true);
+ KalmanVertexFitter vtx_kvf(true);
+ //AdaptiveVertexFitter vtx_avf; 
  /////
  //   Primary vertex
  /////
@@ -264,8 +268,8 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  //tree->lep_numl = lep_numl;
  int lep_numt = tightleps.size();
  //tree->lep_numt = lep_numt;
- if(lep_numl>1) tree->lep_dichprodl = looseleps[0]->charge()*looseleps[1]->charge();
- if(lep_numt>1) tree->lep_dichprodt = tightleps[0]->charge()*tightleps[1]->charge();
+ //if(lep_numl>1) tree->lep_dichprodl = looseleps[0]->charge()*looseleps[1]->charge();
+ //if(lep_numt>1) tree->lep_dichprodt = tightleps[0]->charge()*tightleps[1]->charge();
  //Jets
  int jet_pos = 0;
  int jet_num = 0;
@@ -289,9 +293,10 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  //if(first_jet_lowest_btag)  sort(jet_csv_pos.begin(), jet_csv_pos.end());
  //Now we take the first jet and we consider only one jet per each event
  const pat::Jet & j = (*jets)[jet_csv_pos[0].second]; 
- //Gen level association: 5 for b jets, !5 for non b jets
- if(first_jet_highest_btag && abs(j.partonFlavour())!=5) return; //The first jet must be a b at parton level (for signal) 
- if(first_jet_lowest_btag  && (abs(j.partonFlavour()) ==5 || abs(j.partonFlavour()) ==4)) return; //The first jet must not be a b at parton level (for bkg) 
+ //Gen level association: b==5, c==4
+ if(first_jet_highest_btag && abs(j.partonFlavour())!=5 && abs(j.hadronFlavour())!=5) return; //The first jet must be a b at parton level (for signal) 
+ if(first_jet_highest_ctag && abs(j.partonFlavour())!=4 && abs(j.hadronFlavour())!=4) return;//The first Jet must be a c jet at parton level.
+ if(first_jet_lowest_btag  && (abs(j.partonFlavour())==5 || abs(j.partonFlavour())==4 || abs(j.hadronFlavour())==4 || abs(j.hadronFlavour()==5))) return; //The first jet must not be a b or a c at parton level (for bkg) 
  tree->loop_initialize();
  tree->lep_numl      = lep_numl;
  tree->lep_numt      = lep_numt;
@@ -305,6 +310,7 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  tree->jet_eta = j.eta();
  tree->jet_phi = j.phi();
  tree->jet_en  = j.energy();
+ //Geometry
  //B tag prop
  double jet_csv_double = j.bDiscriminator("combinedInclusiveSecondaryVertexV2BJetTags");
  tree->jet_csv = jet_csv_double;
@@ -315,16 +321,14 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  int jet_chtrksnpv_int = 0;
  vector<Track> jetchtrks;
  vector<Track> jetchtrksnpv; 
- int jet_chtrkspvtt_int  = 0;
- int jet_chtrksnpvtt_int = 0;
- get_jettrks(j, PV, *ttrkbuilder, jet_ndaus_int, jet_chtrks_int, jet_chtrkspv_int, jet_chtrksnpv_int, jetchtrks, jetchtrksnpv, jet_chtrkspvtt_int, jet_chtrksnpvtt_int); 
- tree->jet_ndaus       = jet_ndaus_int;
- tree->jet_chtrks      = jet_chtrks_int;
- tree->jet_chtrkspv    = jet_chtrkspv_int;
- tree->jet_chtrksnpv   = jet_chtrksnpv_int;
- tree->jet_chtrkspvtt  = jet_chtrkspvtt_int;
- tree->jet_chtrksnpvtt = jet_chtrksnpvtt_int;
- /////Vertex compatibility 
+ get_jettrks(j, PV, *ttrkbuilder, jet_ndaus_int, jet_chtrks_int, jet_chtrkspv_int, jet_chtrksnpv_int, jetchtrks, jetchtrksnpv);
+ tree->jet_ndaus     = jet_ndaus_int;
+ tree->jet_chtrks    = jet_chtrks_int;
+ tree->jet_chtrkspv  = jet_chtrkspv_int;
+ tree->jet_chtrksnpv = jet_chtrksnpv_int;
+ /////
+ //   Vertex compatibility 
+ /////
  //chi2
  double jet_chi2tot_double  = -999;
  double jet_chi2ndf_double  = -1;
@@ -336,199 +340,25 @@ void BTagReco::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
  //Two trk info
  double jet_num2v_double     = 0;
  double jet_numno2v_double   = 0;
- double jet_dca3d2t_double   = 0;
- double jet_dca3dno2t_double = 0;
- double jet_dca2d2t_double   = 0;
- double jet_dca2dno2t_double = 0;
- get_2trksinfo(jetchtrks, *ttrkbuilder, jet_num2v_double, jet_numno2v_double, jet_dca3d2t_double, jet_dca3dno2t_double, jet_dca2d2t_double, jet_dca2dno2t_double); 
+ get_2trksinfo(jetchtrks, *ttrkbuilder, jet_num2v_double, jet_numno2v_double); 
  tree->jet_num2v       = jet_num2v_double;
  tree->jet_numno2v     = jet_numno2v_double;
  tree->jet_num2vno2v   = jet_num2v_double+jet_numno2v_double;
- ////Get the track IP info
- //Variables
- int track_3D_pos = 0;
- int track_2D_pos = 0;
- int track_1D_pos = 0;
- int track_num    = 0; 
- vector<pair<double,int> > trk_3D_IP;
- vector<pair<double, int>> trk_2D_IP;
- vector<pair<double, int>> trk_1D_IP;
- //Take the reco direction
- //GlobalVector gv3D(j.px(),j.py(),j.pz());
- //GlobalVector gv2D(j.px(),j.py(),0);
- //GlobalVector gv1D(0,0,j.pz());
- //Take the gen direction (from parton)
- const reco::GenParticle * jet_genparton = j.genParton(); 
- GlobalVector gv3D(jet_genparton->px(),jet_genparton->py(),jet_genparton->pz());
- GlobalVector gv2D(jet_genparton->px(),jet_genparton->py(),0);
- GlobalVector gv1D(0,0,jet_genparton->pz());
- //Take the gen direction (from jet)
- //const reco::GenJet * jet_genjet = j.genJet();
- //GlobalVector gv3D(jet_genjet->px(),jet_genjet->py(),jet_genjet->pz());
- //GlobalVector gv2D(jet_genjet->px(),jet_genjet->py(),0);
- //GlobalVector gv1D(0,0,jet_genjet->pz());
-
-
- double trk_IP3D_val  = -999;
- double trk_IP3D_sig  = -999;
- double trk_IP2D_val  = -999;
- double trk_IP2D_sig  = -999;
- double trk_sIP3D_val = -999;
- double trk_sIP3D_sig = -999;
- double trk_sIP2D_val = -999;
- double trk_sIP2D_sig = -999;
- double trk_IP1D_val  = -999;
- double trk_IP1D_sig  = -999;
- double trk_sIP1D_val = -999;
- double trk_sIP1D_sig = -999;
- double trk_IP3D_err  = -999;
- double trk_sIP3D_err = -999;
- double trk_IP2D_err  = -999;
- double trk_sIP2D_err = -999;
- double trk_IP1D_err  = -999;
- double trk_sIP1D_err = -999;
- //Get track 3D info
- for(uint i=0;i<jetchtrks.size();i++)
- {
-  Track trk            = jetchtrks[i];
-  TransientTrack ttrk  = ttrkbuilder->build(&trk);
-  IPToolsValues3D(ttrk,PV,gv3D,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err,trk_sIP3D_err);
-  trk_3D_IP.push_back(make_pair(trk_IP3D_val,track_3D_pos)); 
-  track_3D_pos++;
-  track_num++;
- }
- if(track_num==0) return;
- sort(trk_3D_IP.rbegin(), trk_3D_IP.rend());
- for(uint k=0;k<jetchtrks.size();k++)
- {
-  int track3D           = trk_3D_IP[k].second;
-  Track trk3D           = jetchtrks[track3D];
-  TransientTrack ttrk3D = ttrkbuilder->build(&trk3D);
-  IPToolsValues3D(ttrk3D,PV,gv3D,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err,trk_sIP3D_err);
-  tree->trk_IP3D_val[k]  = trk_IP3D_val;
-  tree->trk_IP3D_sig[k]  = trk_IP3D_sig;
-  tree->trk_IP3D_err[k]  = trk_IP3D_err;
-  tree->trk_sIP3D_val[k] = trk_sIP3D_val;
-  tree->trk_sIP3D_sig[k] = trk_sIP3D_sig;
-  tree->trk_sIP3D_err[k] = trk_sIP3D_err;
- } 
- //Get track 2D info 
- for(uint i=0;i<jetchtrks.size();i++)
- {
-  Track trk2D            = jetchtrks[i];
-  TransientTrack ttrk2D  = ttrkbuilder->build(&trk2D);
-  IPToolsValues2D(ttrk2D,PV,gv2D,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig,trk_IP2D_err,trk_sIP2D_err);
-  trk_2D_IP.push_back(make_pair(trk_IP2D_val,track_2D_pos));
-  track_2D_pos++;
- }
- sort(trk_2D_IP.rbegin(),trk_2D_IP.rend());
- for(uint k=0;k<jetchtrks.size();k++)
- {
-  int track2D           = trk_2D_IP[k].second;
-  Track trk2D           = jetchtrks[track2D];
-  TransientTrack ttrk2D = ttrkbuilder->build(&trk2D);
-  IPToolsValues2D(ttrk2D,PV,gv2D,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig, trk_IP2D_err, trk_sIP2D_err);
-  tree->trk_IP2D_val[k]  = trk_IP2D_val;
-  tree->trk_IP2D_sig[k]  = trk_IP2D_sig;
-  tree->trk_IP2D_err[k]  = trk_IP2D_err;
-  tree->trk_sIP2D_val[k] = trk_sIP2D_val;
-  tree->trk_sIP2D_sig[k] = trk_sIP2D_sig;
-  tree->trk_sIP2D_err[k] = trk_sIP2D_err;
- }
- //Get track 1D info 
- for(uint i=0;i<jetchtrks.size();i++)
- {
-  Track trk1D            = jetchtrks[i];
-  TransientTrack ttrk1D  = ttrkbuilder->build(&trk1D);
-  IPToolsValues1D(ttrk1D,PV,gv1D,trk_IP1D_val,trk_IP1D_sig,trk_sIP1D_val,trk_sIP1D_sig, trk_IP1D_err, trk_sIP1D_err);
-  trk_1D_IP.push_back(make_pair(trk_IP1D_val,track_1D_pos));
-  track_1D_pos++;
- }
- sort(trk_1D_IP.rbegin(),trk_1D_IP.rend());
- for(uint k=0;k<jetchtrks.size();k++)
- {
-  int track1D           = trk_1D_IP[k].second;
-  Track trk1D           = jetchtrks[track1D];
-  TransientTrack ttrk1D = ttrkbuilder->build(&trk1D);
-  IPToolsValues1D(ttrk1D,PV,gv1D,trk_IP1D_val,trk_IP1D_sig,trk_sIP1D_val,trk_sIP1D_sig, trk_IP1D_err, trk_sIP1D_err);
-  tree->trk_IP1D_val[k]  = trk_IP1D_val;
-  tree->trk_IP1D_sig[k]  = trk_IP1D_sig;
-  tree->trk_IP1D_err[k]  = trk_IP1D_err;
-  tree->trk_sIP1D_val[k] = trk_sIP1D_val;
-  tree->trk_sIP1D_sig[k] = trk_sIP1D_sig;
-  tree->trk_sIP1D_err[k] = trk_sIP1D_err;
- }
  /////
- //   Fill tree
+ //   Get the track IP info
  /////
- tree->tree->Fill();
-}
-
-// ------------ method called once each job just before starting event loop  ------------
-void 
-BTagReco::beginJob()
-{
- stopwatch->Start();
- evt_totnum = 0;
-}
-
-// ------------ method called once each job just after ending the event loop  ------------
-void 
-BTagReco::endJob() 
-{
- stopwatch->Stop(); 
- cout<<endl;
- cout<<"Rapid job summary "<<endl;
- cout<<evt_totnum<<" events analysed in "<<stopwatch->RealTime()<<" seconds"<<endl;
- cout<<endl;
-}
-// ------------ method called when starting to processes a run  ------------
-/*
-void 
-BTagReco::beginRun(edm::Run const&, edm::EventSetup const&)
-{
-}
-*/
-
-// ------------ method called when ending the processing of a run  ------------
-/*
-void 
-BTagReco::endRun(edm::Run const&, edm::EventSetup const&)
-{
-}
-*/
-
-// ------------ method called when starting to processes a luminosity block  ------------
-/*
-void 
-BTagReco::beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&)
-{
-}
-*/
-
-// ------------ method called when ending the processing of a luminosity block  ------------
-/*
-void 
-BTagReco::endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&)
-{
-}
-*/
-// ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
-void
-BTagReco::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
-  //The following says we do not know what parameters are allowed so do no validation
-  // Please change this to state exactly what you do use, even if it is no parameters
-  edm::ParameterSetDescription desc;
-  desc.setUnknown();
-  descriptions.addDefault(desc);
-}
-//define this as a plug-in
-DEFINE_FWK_MODULE(BTagReco);
-/*
+ //Need a vertex to measure the IP and a direction for signed IP
+ //Get the primary vertex (PV) position (the vertex currently used by BTag algorithm)
+ tree->PVx = PV.position().x();
+ tree->PVy = PV.position().y();
+ tree->PVz = PV.position().z();
+ //Take the reco direction of the jet (the direction currently used by BTag algorithm) 
+ GlobalVector gv(j.px(),j.py(),j.pz());
+ //Want also to investigate new possibilities for the vertex and the direction for IP measurements
  /////
- //   New variables defined refiting the primary vertex
- /////
- //Refiting the primary vertex with all the tracks     
+ //   New vertex (we can consider to test the unbiased vertex (i.e. the PV refitted without jet trks))
+ ////
+ //At first, we need to refit PV at miniAOD level (refitted vertex = RV) using PF+lost tracks 
  vector<Track> pvtrks;
  vector<TransientTrack> pvttrks;
  for(uint i=0; i<pfs->size(); i++){
@@ -549,49 +379,311 @@ DEFINE_FWK_MODULE(BTagReco);
    pvttrks.push_back(ttrk);
   }
  }
- double Spvx=0;
- double Spvy=0;
- double Spvz=0;
- Spvx = PV.position().x();
- Spvy = PV.position().y();
- Spvz = PV.position().z();
- TransientVertex pv = vtxFitter.vertex(pvttrks);
- double Rpvx=0;
- double Rpvy=0;
- double Rpvz=0;
- Rpvx = pv.position().x();
- Rpvy = pv.position().y();
- Rpvz = pv.position().z();
- tree->PVxpvx = Spvx-Rpvx;
- tree->PVypvy = Spvy-Rpvy;
- tree->PVzpvz = Spvz-Rpvz;
- //Refiting the primary vertex with all the tracks, but the jet tracks     
+ //Refit the vertex with KalmanVertex fitting technique 
+ TransientVertex RV_kvf;
+ if(pvttrks.size()>=2) RV_kvf = vtx_kvf.vertex(pvttrks);
+ if(RV_kvf.isValid()) tree->pv_ntrks = pvttrks.size();
+ if(RV_kvf.isValid()){
+  tree->diff_PVx_RVx_kvf = PV.position().x()-RV_kvf.position().x();
+  tree->diff_PVy_RVy_kvf = PV.position().y()-RV_kvf.position().y();
+  tree->diff_PVz_RVz_kvf = PV.position().z()-RV_kvf.position().z();
+  tree->RV_kvf_3D        = sqrt(pow(PV.position().x()-RV_kvf.position().x(),2)+pow(PV.position().y()-RV_kvf.position().y(),2)+pow(PV.position().z()-RV_kvf.position().z(),2)); 
+ }
+ //Refit the vertex with KalmanVertex fitting technique with Beamspot constraint
+ TransientVertex RV_kvf_bs;
+ edm::Handle<reco::BeamSpot> beamSpot;
+ iEvent.getByLabel("offlineBeamSpot",beamSpot);
+ if(pvttrks.size()>=2) RV_kvf_bs = vtx_kvf.vertex(pvttrks,*beamSpot);
+ if(RV_kvf_bs.isValid()){
+  tree->diff_PVx_RVx_kvf_bs = PV.position().x()-RV_kvf_bs.position().x();
+  tree->diff_PVy_RVy_kvf_bs = PV.position().y()-RV_kvf_bs.position().y();
+  tree->diff_PVz_RVz_kvf_bs = PV.position().z()-RV_kvf_bs.position().z();
+  tree->RV_kvf_bs_3D        = sqrt(pow(PV.position().x()-RV_kvf_bs.position().x(),2)+pow(PV.position().y()-RV_kvf_bs.position().y(),2)+pow(PV.position().z()-RV_kvf_bs.position().z(),2));
+ }
+ //Refit the vertex with AdaptiveVertexFitter technique
+ AdaptiveVertexFitter vtx_avf;
+ vtx_avf.setWeightThreshold(0.1); 
+ TransientVertex RV_avf;
+ TransientVertex RV_avf_bs;
+ if(pvttrks.size()>=2) RV_avf = vtx_avf.vertex(pvttrks);
+ if(RV_avf.isValid()){ 
+  tree->diff_PVx_RVx_avf = PV.position().x()-RV_avf.position().x();
+  tree->diff_PVy_RVy_avf = PV.position().y()-RV_avf.position().y();
+  tree->diff_PVz_RVz_avf = PV.position().z()-RV_avf.position().z();
+  tree->RV_avf_3D        = sqrt(pow(PV.position().x()-RV_avf.position().x(),2)+pow(PV.position().y()-RV_avf.position().y(),2)+pow(PV.position().z()-RV_avf.position().z(),2));
+ }
+ //Refit the vertex with AdaptiveVertexFitter technique with Beamspot constraint
+ if(pvttrks.size()>=2) RV_avf_bs = vtx_avf.vertex(pvttrks,*beamSpot);
+ if(RV_avf_bs.isValid()){
+  tree->diff_PVx_RVx_avf_bs = PV.position().x()-RV_avf_bs.position().x();
+  tree->diff_PVy_RVy_avf_bs = PV.position().y()-RV_avf_bs.position().y();
+  tree->diff_PVz_RVz_avf_bs = PV.position().z()-RV_avf_bs.position().z();
+  tree->RV_avf_bs_3D        = sqrt(pow(PV.position().x()-RV_avf_bs.position().x(),2)+pow(PV.position().y()-RV_avf_bs.position().y(),2)+pow(PV.position().z()-RV_avf_bs.position().z(),2));
+ } 
+ //At second, refit the Vertex after excluding jet tracks from track collection
+ //Get the Jet tracks(PV and NotFromPV(nPV)) with similar conditions used to refit the PV at miniAOD level 
+ //This step is needed because when filling jetchtrks, jetchtrksnpv we require BTag track selection 
+ vector<Track> jetchtrks_PV; 
+ get_jettrks_PV(j,*ttrkbuilder,jetchtrks_PV);
+ vector<Track> jetchtrks_nPV;
+ get_jettrks_nPV(j,*ttrkbuilder,jetchtrks_nPV); 
+ //Refit the vertex
  vector<Track> pvtrks_wt_jettrk;
  vector<TransientTrack> pvttrks_wt_jettrk;
- for(uint t=0; t<pvtrks.size(); t++){
-  for(uint jt = 0; jt<jetchtrks.size(); jt++){
-   if(pvtrks[t].pt() !=  jetchtrks[jt].pt()){
-    pvtrks_wt_jettrk.push_back(pvtrks[t]);
-    TransientTrack ttrk = ttrkbuilder->build(&pvtrks[t]);
-    pvttrks_wt_jettrk.push_back(ttrk);
-   }
+ for(uint pvt=0; pvt<pvtrks.size(); pvt++){
+  bool ispvtracks = false;
+  for(uint jt=0; jt<jetchtrks_PV.size(); jt++) if(jetchtrks_PV[jt].pt()==pvtrks[pvt].pt()) ispvtracks = true;
+  if(!ispvtracks){
+   pvtrks_wt_jettrk.push_back(pvtrks[pvt]);
+   TransientTrack ttrk = ttrkbuilder->build(pvtrks[pvt]);
+   pvttrks_wt_jettrk.push_back(ttrk);  
   }
  }
- if(pvttrks_wt_jettrk.size()>2){
-  TransientVertex pvnb = vtxFitter.vertex(pvttrks_wt_jettrk);
-  if(pvnb.isValid()){
-   double RpvX=0;
-   double RpvY=0;
-   double RpvZ=0;
-   RpvX = pvnb.position().x();
-   RpvY = pvnb.position().y();
-   RpvZ = pvnb.position().z();
-   tree->PVxnob = Spvx-RpvX;
-   tree->PVynob = Spvy-RpvY;
-   tree->PVznob = Spvz-RpvZ;
-   tree->pvxnob = Rpvx-RpvX;
-   tree->pvynob = Rpvy-RpvY;
-   tree->pvznob = Rpvz-RpvZ;
-  }
+ TransientVertex RV_nojet;
+ if(pvttrks_wt_jettrk.size()>=2) RV_nojet = vtx_avf.vertex(pvttrks_wt_jettrk);
+ if(RV_nojet.isValid()) tree->RV_nojet_ntrks = pvtrks_wt_jettrk.size();
+ //Measure the differnce between the RV and RVnojet positions.  
+ if(RV_nojet.isValid() && RV_kvf.isValid()){
+  tree->diff_RV_RVnob_x = RV_kvf.position().x()-RV_nojet.position().x();
+  tree->diff_RV_RVnob_y = RV_kvf.position().y()-RV_nojet.position().y();
+  tree->diff_RV_RVnob_z = RV_kvf.position().z()-RV_nojet.position().z();
+  tree->RV_RVnojet_3D   = sqrt(pow(RV_kvf.position().x()-RV_nojet.position().x(),2)+pow(RV_kvf.position().y()-RV_nojet.position().y(),2)+pow(RV_kvf.position().z()-RV_nojet.position().z(),2));
  }
+ if(RV_kvf.isValid()){
+  tree->RV_x = RV_kvf.position().x();
+  tree->RV_y = RV_kvf.position().y();
+  tree->RV_z = RV_kvf.position().z();
+ }
+ if(RV_nojet.isValid()){
+  tree->RVnojtrk_x  = RV_nojet.position().x();
+  tree->RVnojtrk_y  = RV_nojet.position().y();
+  tree->RVnojtrk_z  = RV_nojet.position().z();
+ }
+ //Try also to add nonPV trks to the PVtrks
+ for(uint jt =0;jt<jetchtrks_nPV.size();jt++){
+  bool isnpvtracks = false;
+  for(uint t =0;t<pvtrks.size();t++) if(jetchtrks_nPV[jt].pt()==pvtrks[t].pt()) isnpvtracks = true; 
+  if(!isnpvtracks){
+   pvtrks.push_back(jetchtrks_nPV[jt]);
+   TransientTrack ttrk = ttrkbuilder->build(&jetchtrks_nPV[jt]);
+   pvttrks.push_back(ttrk);
+  }   
+ }
+ //Measure chi2/ndf for RV, RVnojet and RV_addjtrack 
+ TransientVertex RV_add_jettrks;
+ if(pvttrks_wt_jettrk.size()>=2) RV_add_jettrks                                             = vtx_avf.vertex(pvttrks);
+ if(RV_add_jettrks.isValid() && RV_kvf.isValid()) tree->RV_RVaddjtrcks_NPV_3D               = sqrt(pow(RV_kvf.position().x()-RV_add_jettrks.position().x(),2)+pow(RV_kvf.position().y()-RV_add_jettrks.position().y(),2)+pow(RV_kvf.position().z()-RV_add_jettrks.position().z(),2));
+ if(RV_add_jettrks.isValid() && RV_nojet.isValid()) tree->diff_chi2_ndf_RV_addjettrks_RVnob = (RV_add_jettrks.totalChiSquared()/RV_add_jettrks.degreesOfFreedom())-(RV_nojet.totalChiSquared()/RV_nojet.degreesOfFreedom());
+ if(RV_kvf.isValid())tree->RV_nchi2_ndf                                                     = RV_kvf.totalChiSquared()/RV_kvf.degreesOfFreedom();
+ if(RV_nojet.isValid() && RV_kvf.isValid()) tree->RVnojet_chi2_ndf                          = (RV_kvf.totalChiSquared()/RV_kvf.degreesOfFreedom())-(RV_nojet.totalChiSquared()/RV_nojet.degreesOfFreedom());
+ /////
+ //   New direction given by the jet flight distance
+ /////
+ //Get some info at gen level
+ const reco::GenParticle * jet_genparton = j.genParton();
+ if(!jet_genparton) return;
+ const reco::GenJet * jet_genjet = j.genJet();
+ if(!jet_genjet) return;
+ //Measure the dR between genParton, genJet and Jet direction.
+ double deltaR_gen_reco =  deltaR(j.eta(), j.phi(), jet_genparton->eta(), jet_genparton->phi());
+ double deltaR_jet_reco =  deltaR(j.eta(), j.phi(), jet_genjet->eta(), jet_genjet->phi());
+ double deltaR_jet_gen  =  deltaR(jet_genparton->eta(), jet_genparton->phi(), jet_genjet->eta(), jet_genjet->phi());
+ tree->deltaR_reco_gen  =  deltaR_gen_reco;
+ tree->deltaR_reco_jet  =  deltaR_jet_reco;
+ tree->deltaR_gen_jet   =  deltaR_jet_gen; 
+ //Fit Vertex using jet Tracks.
+ vector<TransientTrack> jetchttrks;
+ for(uint i=0;i<jetchtrks.size();i++){
+  Track trk            = jetchtrks[i];
+  TransientTrack ttrk  = ttrkbuilder->build(&trk); 
+  jetchttrks.push_back(ttrk);
+ }
+ TransientVertex jet_vertex;
+ if(jetchttrks.size()>=2) jet_vertex = vtx_kvf.vertex(jetchttrks);
+ GlobalVector gv_pvx_jetchtrks;
+ if(jet_vertex.isValid()){
+  GlobalVector temp(jet_vertex.position().x()-PV.position().x(),jet_vertex.position().y()-PV.position().y(),jet_vertex.position().z()-PV.position().z());
+  gv_pvx_jetchtrks = temp;
+ }else{
+  GlobalVector temp(j.px(),j.py(),j.pz());
+  gv_pvx_jetchtrks = temp;
+ }
+ /////
+ //   Now access the IP information
+ /////
+ double trk_IP3D_val          = -999;
+ double trk_IP3D_sig          = -999;
+ double trk_IP2D_val          = -999;
+ double trk_IP2D_sig          = -999;
+ double trk_sIP3D_val         = -999;
+ double trk_sIP3D_sig         = -999;
+ double trk_sIP2D_val         = -999;
+ double trk_sIP2D_sig         = -999;
+ double trk_IP3D_err          = -999;
+ double trk_sIP3D_err         = -999;
+ double trk_IP2D_err          = -999;
+ double trk_sIP2D_err         = -999;
+ double trk_IP3D_val_RV_jetV  = -999;
+ double trk_IP3D_sig_RV_jetV  = -999;
+ double trk_sIP3D_val_RV_jetV = -999;
+ double trk_sIP3D_sig_RV_jetV = -999;
+ double trk_IP3D_err_RV_jetV  = -999;
+ double trk_sIP3D_err_RV_jetV = -999;
+ //Get track 3D info
+ int track_3D_pos         = 0;
+ int track_2D_pos         = 0;
+ int track_3D_pos_new     = 0; //New means using a new direction (not the jet axis)
+ vector<pair<double,int>> trk_3D_IP;
+ vector<pair<double,int>> trk_2D_IP;
+ vector<pair<double,int>> trk_3D_IP_new;
+ for(uint i=0;i<jetchtrks.size();i++){ 
+  Track trk            = jetchtrks[i];
+  TransientTrack ttrk  = ttrkbuilder->build(&trk);
+  IPToolsValues3D(ttrk,PV,gv,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err,trk_sIP3D_err);
+  trk_3D_IP.push_back(make_pair(trk_IP3D_val,track_3D_pos)); 
+  track_3D_pos++;
+ }
+ sort(trk_3D_IP.rbegin(),trk_3D_IP.rend());
+ for(uint k=0;k<jetchtrks.size();k++){
+  int track3D            = trk_3D_IP[k].second;
+  Track trk3D            = jetchtrks[track3D];
+  tree->track_pt[k]      = trk3D.pt();
+  TransientTrack ttrk3D  = ttrkbuilder->build(&trk3D);
+  IPToolsValues3D(ttrk3D,PV,gv,trk_IP3D_val,trk_IP3D_sig,trk_sIP3D_val,trk_sIP3D_sig,trk_IP3D_err, trk_sIP3D_err);
+  tree->trk_IP3D_val[k]  = trk_IP3D_val;
+  tree->trk_IP3D_sig[k]  = trk_IP3D_sig;
+  tree->trk_IP3D_err[k]  = trk_IP3D_err;
+  tree->trk_sIP3D_val[k] = trk_sIP3D_val;
+  tree->trk_sIP3D_sig[k] = trk_sIP3D_sig;
+  tree->trk_sIP3D_err[k] = trk_sIP3D_err;
+ }
+ //Get IP3D using new direction
+ for(uint i=0;i<jetchtrks.size();i++){
+  Track trk            = jetchtrks[i];
+  TransientTrack ttrk  = ttrkbuilder->build(&trk);
+  IPToolsValues3D(ttrk,PV,gv_pvx_jetchtrks,trk_IP3D_val_RV_jetV,trk_IP3D_sig_RV_jetV,trk_sIP3D_val_RV_jetV,trk_sIP3D_sig_RV_jetV,trk_IP3D_err_RV_jetV,trk_sIP3D_err_RV_jetV);
+  trk_3D_IP_new.push_back(make_pair(trk_IP3D_val_RV_jetV,track_3D_pos_new));
+  track_3D_pos_new++;
+ }
+ sort(trk_3D_IP_new.rbegin(),trk_3D_IP_new.rend());
+ for(uint k=0;k<jetchtrks.size();k++){
+  int track3D            = trk_3D_IP[k].second;
+  Track trk3D            = jetchtrks[track3D];
+  tree->track_pt[k]      = trk3D.pt();
+  TransientTrack ttrk3D  = ttrkbuilder->build(&trk3D);
+  IPToolsValues3D(ttrk3D,PV,gv_pvx_jetchtrks,trk_IP3D_val_RV_jetV,trk_IP3D_sig_RV_jetV,trk_sIP3D_val_RV_jetV,trk_sIP3D_sig_RV_jetV,trk_IP3D_err_RV_jetV, trk_sIP3D_err_RV_jetV);
+  tree->trk_IP3D_val_RV_jetV[k]  = trk_IP3D_val_RV_jetV;
+  tree->trk_IP3D_sig_RV_jetV[k]  = trk_IP3D_sig_RV_jetV;
+  tree->trk_IP3D_err_RV_jetV[k]  = trk_IP3D_err_RV_jetV;
+  tree->trk_sIP3D_val_RV_jetV[k] = trk_sIP3D_val_RV_jetV;
+  tree->trk_sIP3D_sig_RV_jetV[k] = trk_sIP3D_sig_RV_jetV;
+  tree->trk_sIP3D_err_RV_jetV[k] = trk_sIP3D_err_RV_jetV;
+ }
+ //Get track 2DIP info
+ for(uint i=0;i<jetchtrks.size();i++){
+  Track trk2D            = jetchtrks[i];
+  TransientTrack ttrk2D  = ttrkbuilder->build(&trk2D);
+  IPToolsValues2D(ttrk2D,PV,gv_pvx_jetchtrks,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig, trk_IP2D_err, trk_sIP2D_err);
+  trk_2D_IP.push_back(make_pair(trk_IP2D_val,track_2D_pos));
+  track_2D_pos++;
+ } 
+ sort(trk_2D_IP.rbegin(),trk_2D_IP.rend());
+ for(uint k=0;k<jetchtrks.size();k++){ 
+  int track2D            = trk_2D_IP[k].second;
+  Track trk2D            = jetchtrks[track2D];
+  TransientTrack ttrk2D  = ttrkbuilder->build(&trk2D);
+  IPToolsValues2D(ttrk2D,PV,gv_pvx_jetchtrks,trk_IP2D_val,trk_IP2D_sig,trk_sIP2D_val,trk_sIP2D_sig, trk_IP2D_err, trk_sIP2D_err);
+  tree->trk_IP2D_val[k]  = trk_IP2D_val;
+  tree->trk_IP2D_sig[k]  = trk_IP2D_sig;
+  tree->trk_IP2D_err[k]  = trk_IP2D_err;
+  tree->trk_sIP2D_val[k] = trk_sIP2D_val;
+  tree->trk_sIP2D_sig[k] = trk_sIP2D_sig;
+  tree->trk_sIP2D_err[k] = trk_sIP2D_err;
+ }
+ //Meaure Decay Length 3D,2D and 1D
+ double DL3D_val   = -999;
+ double DL3D_error = -999;
+ double DL3D_sig   = -999;
+ double DL2D_val   = -999;
+ double DL2D_error = -999;
+ double DL2D_sig   = -999;
+ double DL1D_val   = -999;
+ double DL1D_error = -999;
+ double DL1D_sig   = -999;
+ for(uint k=0;k<jetchtrks.size();k++){
+  Track trk            = jetchtrks[k];
+  TransientTrack ttrk3D  = ttrkbuilder->build(&trk);
+  DecayLength3D(ttrk3D,PV,gv,DL3D_val,DL3D_error,DL3D_sig);
+  DecayLength2D(ttrk3D,PV,gv,DL2D_val,DL2D_error,DL2D_sig);
+  DecayLength1D(ttrk3D,PV,gv,DL1D_val,DL1D_error,DL1D_sig);
+  tree->DL3D_val[k]  = fabs(DL3D_val);
+  tree->sDL3D_val[k] = DL3D_val;
+  tree->DL3D_sig[k]  = fabs(DL3D_sig);
+  tree->sDL3D_sig[k] = DL3D_sig;
+  tree->DL2D_val[k]  = fabs(DL2D_val);
+  tree->sDL2D_val[k] = DL2D_val;
+  tree->sDL2D_sig[k] = DL2D_sig;
+  tree->DL2D_sig[k]  = fabs(DL2D_sig);
+  tree->DL1D_val[k]  = fabs(DL1D_val);
+  tree->sDL1D_val[k] = DL1D_val;
+  tree->DL1D_sig[k]  = fabs(DL1D_sig);
+  tree->sDL1D_sig[k] = DL1D_sig;
+ }
+ tree->tree->Fill();
+}
+// ------------ method called once each job just before starting event loop  ------------
+void 
+BTagReco::beginJob()
+{
+ stopwatch->Start();
+ evt_totnum = 0;
+}
+// ------------ method called once each job just after ending the event loop  ------------
+void 
+BTagReco::endJob() 
+{
+ stopwatch->Stop(); 
+ cout<<endl;
+ cout<<"Rapid job summary "<<endl;
+ cout<<evt_totnum<<" events analysed in "<<stopwatch->RealTime()<<" seconds"<<endl;
+ cout<<endl;
+}
+// ------------ method called when starting to processes a run  ------------
+/*
+void 
+BTagReco::beginRun(edm::Run const&, edm::EventSetup const&)
+{
+}
 */
+// ------------ method called when ending the processing of a run  ------------
+/*
+void 
+BTagReco::endRun(edm::Run const&, edm::EventSetup const&)
+{
+}
+*/
+// ------------ method called when starting to processes a luminosity block  ------------
+/*
+void 
+BTagReco::beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&)
+{
+}
+*/
+// ------------ method called when ending the processing of a luminosity block  ------------
+/*
+void 
+BTagReco::endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&)
+{
+}
+*/
+// ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
+void
+BTagReco::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  //The following says we do not know what parameters are allowed so do no validation
+  // Please change this to state exactly what you do use, even if it is no parameters
+  edm::ParameterSetDescription desc;
+  desc.setUnknown();
+  descriptions.addDefault(desc);
+}
+//define this as a plug-in
+DEFINE_FWK_MODULE(BTagReco);

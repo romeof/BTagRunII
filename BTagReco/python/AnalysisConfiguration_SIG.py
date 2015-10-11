@@ -34,21 +34,26 @@ process.demo = cms.EDAnalyzer("BTagReco",
  mindr_p3 = cms.untracked.double(0.3), 
  mindr_p5 = cms.untracked.double(0.5), 
  first_jet_highest_btag = cms.bool(True), 
- first_jet_lowest_btag  = cms.bool(False) 
+ first_jet_lowest_btag  = cms.bool(False),
+ first_jet_highest_ctag = cms.bool(False) 
 )
 #####
 ##   Input files
 #####
 process.source = cms.Source("PoolSource",
  fileNames = cms.untracked.vstring(
-'/store/mc/Spring14miniaod/TTbarH_HToWWTo2L2Nu_M-125_13TeV_amcatnlo-pythia8-tauola/MINIAODSIM/141029_PU40bx50_PLS170_V6AN2-v1/10000/6619F511-6065-E411-B131-0023AEFDE908.root'
+#'/store/mc/Spring14miniaod/TTbarH_HToWWTo2L2Nu_M-125_13TeV_amcatnlo-pythia8-tauola/MINIAODSIM/141029_PU40bx50_PLS170_V6AN2-v1/10000/6619F511-6065-E411-B131-0023AEFDE908.root'
+#'/store/mc/Phys14DR/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_PHYS14_25_V1-v1/00000/6C725C73-0A75-E411-91E3-003048D4364C.root'
+#'/store/mc/Phys14DR/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_PHYS14_25_V1-v1/00000/6C725C73-0A75-E411-91E3-003048D4364C.root'
+'/store/mc/Phys14DR/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_PHYS14_25_V1-v1/10000/2AA6426F-EF75-E411-94DC-002590DB9302.root'
 #'/store/mc/Spring14miniaod/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_POSTLS170_V5-v1/00000/C04535F7-8BFC-E311-B271-0026189438D5.root'
 #'/store/mc/Spring14miniaod/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/Phys14DR-PU20bx25_PHYS14_25_V1-v1/MINIAODSIM/'
 #'/store/mc/Spring14miniaod/TTbarH_HToWWTo2L2Nu_M-125_13TeV_amcatnlo-pythia8-tauola/MINIAODSIM/',
  #skipEvents = cms.untracked.uint32(25) #Skip the first n evt, or comment this line if you do not want to skip evt
 ),
 )
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(30) ) #Num of evt to be analysed (whatever is the starting evt)
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(100) ) #Num of evt to be analysed (whatever is the starting evt)
+#eventsToProcess =cms.untracked.VEventRange('1:47906910-1:47906910')
 #####
 ##   Output file
 #####

@@ -34,16 +34,26 @@ using namespace std;
 /////
 const string path     = "/afs/cern.ch/work/s/sshaheen/CMSSW_7_2_3/src/BTagRunII/BTagReco/macros_panga/";
 //const char *samples[] = {"ttjets_sgnl", "ttjets_bak"};
-const char *samples[] = {"bak_IP_signed","sgnl_IP_signed"};
+//const char *samples[]  = {"bak_IP_signed","sgnl_IP_signed"};
+const char *samples[]    = {"bak_final_v2","sig_final_v2"};
+//onst char *samples1[] = {"bak_IP_signed","sgnl_IP_signed"};
 const string selection = "";
 const int numvar       = 100;
 //Variables
-const char *varfirst[]        = {"jet_csv","trk_sIP3D_val[1]","trk_sIP2D_val[1]","trk_sIP1D_val[1]"};
-const char *varsecond[]       = {"1","1","1","1","1","1","1"}
-const char *vartitle[]        = {"jet_csv","sIP3D_val", "sIP2D_val","sIP1D_val","sIP2D_val"}; onst double cutIni[numvar]  = {0,-1,-1,-1,0,0};
-const double cutFin[numvar]   = {1,1,1,1,1,1};
-const int    npoints[numvar]  = {100,100,100,100,100,100};
-const string namefile         = "plots/ROC_sIP_val_track2.pdf";
+//const char *varfirst[]        = {"jet_csv[0]","jet_num2v[0]", "jet_chi2tot[0]"};//, "jettrksallch_numno2v", "jettrksallch_numno2v"};
+//const char *varfirst[]        = {"jet_csv","trk_sIP3D_val[0]","trk_sIP2D_val[0]","trk_sIP1D_val[0]"};//, "jettrksallch_numno2v[0]", "jettrksallch_numno2v[0]", "jettrksallch_numno2v[0]"};
+const char *varfirst[]        = {"jet_csv","DL3D_sig[0]","DL2D_sig[0]","DL1D_sig[0]"};
+//const char *varsecond[]       = {"1","jet_sumchtrksnpv[0]","jet_sumchtrksnpv[1]","jet_sumchtrksnpv[2]","jet_sumchtrksnpv[3]","jet_sumchtrksnpv[4]"};
+const char *varsecond[]       = {"1","1","1","1","1","1","1"};//,"jettrksallch_num2vno2v[1]","jettrksallch_num2vno2v[2]","jettrksallch_num2vno2v[3]","jettrksallch_num2vno2v[4]"};
+
+//const char *varsecond[]       = {"1","jet_num2vno2v[0]","jet_chi2ndf[0]"};//,"jettrksallch_num2vno2v[0]","jettrksallch_num2vno2v[0]"};
+//const char *varsecond[]       = {"1","1","1","1","1","1"};
+//const char *vartitle[]        = {"CSV (jet)", "#tilde{\#} num2V (Coll 0)", "#tilde{\#} chi2 (Coll 0)"};
+const char *vartitle[]        = {"jet_csv","DL3D_sig", "DL2D_sig","DL1D_sig","IP2D_sig"}; //"#tilde{\#} no2tv (Coll 1)", "#tilde{\#} no2tv (Coll 2)", "#tilde{\#} no2tv (Coll 3)", "#tilde{\#} no2tv (Coll 4)", "#tilde{\#} no2tv (Coll 5)"};
+const double cutIni[numvar]  = {0,0,0,0,0,0};
+const double cutFin[numvar]  = {1,5000,5000,5000,200,5};
+const int    npoints[numvar] = {100,1000,1000,1000,500,100};
+const string namefile        = "plots_RPV/ROC_DL_sig.pdf";
 /////
 //   Declare functions 
 /////
@@ -54,10 +64,10 @@ void setTDRStyle();
 /////
 void ROCcurves(){
  //Preliminarly
- setTDRStyle();
- vector<string> varfirsts(varfirst, varfirst + sizeof(varfirst)/sizeof(varfirst[0])); 
+setTDRStyle();
+ vector<string> varfirsts(varfirst, varfirst + sizeof(varfirst)/sizeof(varfirst[0]));
  vector<string> varseconds(varsecond, varsecond + sizeof(varsecond)/sizeof(varsecond[0]));
- vector<string> vartitles(vartitle, vartitle + sizeof(vartitle)/sizeof(vartitle[0])); 
+ vector<string> vartitles(vartitle, vartitle + sizeof(vartitle)/sizeof(vartitle[0]));
  const uint variables_size = varfirsts.size();
 cout<<"the size is "<<sizeof(varfirst[0])<<endl;
   TCanvas* c1 = new TCanvas("ROC","ROC",200,200,1100,700);
@@ -66,38 +76,37 @@ cout<<"the size is "<<sizeof(varfirst[0])<<endl;
  leg->SetBorderSize(0);
  leg->SetTextSize(0.035);
  //Loop over variables
- for(uint vars=0; vars<variables_size; vars++) 
+ for(uint vars=0; vars<variables_size; vars++)
  //for(uint vars=0; vars<1; vars++)
  {
   cout<<"Var "<<varfirsts[vars]<<endl;
   double cutStep = (cutFin[vars]-cutIni[vars])/npoints[vars];
   vector<string> rootplas(samples, samples + sizeof(samples)/sizeof(samples[0]));
   const uint rootplas_size = rootplas.size();
-  const int npointsint = npoints[vars];   
+  const int npointsint = npoints[vars];
   double effvals[rootplas_size][npointsint];
-  double efferrs[rootplas_size][npointsint]; 
+  double efferrs[rootplas_size][npointsint];
   //Loop over samples
   for(uint smp=0; smp<rootplas_size; smp++){
    cout<<rootplas[smp]<<endl;
    TFile* f = Call_TFile((rootplas[smp]).c_str()); TTree* tree; f->GetObject("tree",tree);
-   double evt_bef = tree->GetEntries(); 
+   double evt_bef = tree->GetEntries();
+   if(evt_bef == -9999) continue;
    int cutpos = 0;
    for(double cut=cutIni[vars]; cut<=cutFin[vars]; cut+=cutStep){
     double evt_aft = 0;
     if(varseconds[vars]=="1") evt_aft = tree->GetEntries(Form("%s>=%f",varfirsts[vars].c_str(),cut));
-    if(varseconds[vars]!="1") evt_aft = tree->GetEntries(Form("%s/%s>=%f",varfirsts[vars].c_str(),varseconds[vars].c_str(),cut));
+    if(varseconds[vars]!="1") evt_aft = tree->GetEntries(Form("%s/%s>=%f",(varfirsts[vars].c_str(),varseconds[vars].c_str(),cut));
     double eff = evt_aft/evt_bef;
-    effvals[smp][cutpos] = eff; 
-    efferrs[smp][cutpos] = 0;  
-    //cout<<effvals[smp][cutpos]<<" ";
+    effvals[smp][cutpos] = eff;
+    efferrs[smp][cutpos] = 0;
     cutpos++;
    }
-   //cout<<endl;
-  }//Loop over samples
-  TGraphErrors *rocurves = new TGraphErrors(npointsint,&effvals[0][0],&effvals[1][0],&efferrs[0][0],&efferrs[1][0]);  
+   }//Loop over samples
+   TGraphErrors *rocurves = new TGraphErrors(npointsint,&effvals[0][0],&effvals[1][0],&efferrs[0][0],&efferrs[1][0]);
   rocurves->SetTitle(0);
-  rocurves->GetXaxis()->SetTitle("Light Flavour jets efficiency");
-  rocurves->GetYaxis()->SetTitle("b Jet efficiency");
+  rocurves->GetXaxis()->SetTitle("Light Flavor Jets efficiency");
+  rocurves->GetYaxis()->SetTitle("b Jets efficiency");
   rocurves->SetMarkerSize(0.3);
   rocurves->SetMarkerColor(1+vars);
   rocurves->SetLineColor(1+vars);
@@ -106,12 +115,13 @@ cout<<"the size is "<<sizeof(varfirst[0])<<endl;
   }else{
    rocurves->Draw("same");
   }
-  leg->AddEntry(rocurves,vartitles[vars].c_str(),"L"); 
- }//Loop over variables
- leg->Draw();
+  leg->AddEntry(rocurves,vartitles[vars].c_str(),"L");
+  }//Loop over variables
+  leg->Draw();
  gPad->RedrawAxis();
  c1->SaveAs(namefile.c_str());
-}
+ }
+
 /////
 //   Call TFile to be read
 /////

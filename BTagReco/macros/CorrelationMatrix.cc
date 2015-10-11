@@ -42,7 +42,7 @@ using namespace std;
 //const string path       = "/afs/cern.ch/work/s/sshaheen/CMSSW_7_2_3/src/preliminary/Practice/Rootplas/";
 const string path = "/afs/cern.ch/work/s/sshaheen/CMSSW_7_2_3/src/BTagRunII/BTagReco/macros_panga/";
 //const char *samples[]   = {"ttjetstree", "tthtree"};
-const char *samples[] = {"bak_IP_signed","sgnl_IP_signed"};
+const char *samples[] = {"bak_RVnew_","sig_RVnew_"};
 const string selection  = "";
 const double Luminosity = 19703.225;//19779.362;//19600;; //pb^-1
 const bool noLumiNorm   = true; //true means NO luminosity normalization done
@@ -54,18 +54,24 @@ const int  numVar = 100;
 //Variables
 
 const int  vini   = 0;
-const int  vfin   = 6;
+const int  vfin   = 3;
 const int  vvini  = 0;
-const int  vvfin  = 6;
+const int  vvfin  = 3;
 const string corrmat = "CorrelationMat_";
-const char *variablesNum[]    = {"trk_sIP3D_val", "trk_sIP3D_sig","trk_sIP2D_val","trk_sIP2D_sig","trk_sIP1D_val","trk_sIP1D_sig","jet_csv"};
-const int  vtNum[numVar]      = {4,4,4,4,4,4,1};
-const char *variablesDen[]    = {"duno","duno","duno", "duno","duno","duno","duno","duno"};
-const int  vtDen[numVar]      = {1,1,1,1,1,1,1,1};
-const char *titles[]          = {"sIP3D_val ","sIP3D_sig ","sIP2D_val","sIP2D_sig","sIP1D_val","sIP1D_sig","jet_csv"};
-const char *titlespdf[]       = {"sIP3D_val_trk1","sIP3D_sig_trk1","sIP2D_val_trk1","sIP2D_sig_trk1","sIP1D_val_trk1","sIP1D_sig_trk1","jet_csv"};
-const double inRange[numVar]  = {-1,-100,-1,-100,-1,-100,0};
-const double endRange[numVar] = {1 ,200, 1, 200 , 1, 200,1};
+//const char *variablesNum[]    = {"diff_RP_PV_x", "diff_RP_PV_y","diff_RP_PV_z","PV_x","PV_y","PV_z"};
+//const char *variablesNum[]    = {"trk_sIP3D_val","trk_sIP3D_sig","ratio_sIP3D_val_ntrks","ratio_sIP3D_sig_ntrks"};
+const char *variablesNum[]    = {"jet_csv","jet_chi2tot","RVnojet_chi2_ndf","diff_chi2_ndf_RV_addjettrks_RVnob"};
+const int  vtNum[numVar]      = {1,1,1,1};
+const char *variablesDen[]    = {"duno","jet_chi2ndf","duno", "duno"};
+const int  vtDen[numVar]      = {1,1,1,1};
+const char *titles[]          = {"jet_csv","#chi^2/ndf(jet)","#chi^2/ndf_#1^st","#chi^2/ndf_#2^nd"};
+const char *titlespdf[]       = {"jet_csv","#chi^2/ndf(jet)","#chi^2/ndf_#1^st","#chi^2/ndf_#2^nd"};
+//const char *titles[]          = {"trk_sIP3D_val", "trk_sIP3D_sig","av_sIP3D_val","ave_sIP3D_sig"};
+//const char *titlespdf[]       = {"trk_sIP3D_val", "trk_sIP3D_sig","av_sIP3D_val","ave_sIP3D_sig"};
+//const double inRange[numVar]  = {-20,-20,-20,-5,-5,-5};
+//const double endRange[numVar] = {20,20,20,5,5,5};
+const double inRange[numVar]  = {0,0,-5,-5,-5000,-5000};
+const double endRange[numVar] = {10,100,5,5,5000,5000};
 const int    bin[numVar]      = {100, 100,100,100,100, 100,100};
 /////
 //   Declare functions 
@@ -89,7 +95,7 @@ TH2F*  darr_iarr_darr_iarr(string sample_vars, TTree* tree, int r,int v,int vv);
 TH2F*  darr_iarr_darr_darr(string sample_vars, TTree* tree, int r,int v,int vv);
 //double_double_double
 TH2F*  double_double_double_double(string sample_vars, TTree* tree, int r,int v,int vv);
-//darr_d_d
+//darr_darr_d
 TH2F*  darr_double_double_double(string sample_vars, TTree* tree, int r,int v,int vv);
 void   drawscattplot(TH2F* histo);
 void   drawcorrmat(TH2F* histo);
@@ -109,8 +115,8 @@ void CorrelationMatrix(){
  for(uint r=0; r<rootplas.size(); r++){
   cout<<rootplas[r]<<endl;
   string s_corrmat = "Correlation matrix";
-  if(rootplas[r]== "bak_IP_signed")     s_corrmat = s_corrmat+" Light Flavour Jets";
-  if(rootplas[r]== "sgnl_IP_signed")    s_corrmat = s_corrmat+" b Jets";
+  if(rootplas[r]== "bak_RVnew_")     s_corrmat = s_corrmat+" Light flavor Jets";
+  if(rootplas[r]== "sig_RVnew_")    s_corrmat = s_corrmat+" b Jets";
   TH2F* h_corrmat = new TH2F(s_corrmat.c_str(), s_corrmat.c_str(), (vfin-vini)+1,0,(vfin-vini)+1, (vvfin-vvini)+1,0,(vvfin-vvini)+1);
   //Call tree  
   TFile* f = Call_TFile(rootplas[r]); TTree* tree; f->GetObject("tree",tree);
@@ -136,21 +142,21 @@ void CorrelationMatrix(){
     if(vtNum[v]<-1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]<-1)  h_scattplot = iarr_d_darr_iarr(sample_vars,tree,r,v,vv);
     if(vtNum[v]<-1 && vtDen[v]==1 && vtNum[vv]<-1 && vtDen[vv]==1) h_scattplot = iarr_d_iarr_d(sample_vars,tree,r,v,vv);
     //darr_d
-    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]<-1 && vtDen[vv]==1)  h_scattplot = darr_d_iarr_d(sample_vars,tree,r,v,vv);
-    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]==1)   h_scattplot = darr_d_darr_d(sample_vars,tree,r,v,vv);
-    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]<-1)   h_scattplot = darr_d_darr_iarr(sample_vars,tree,r,v,vv);
-    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]>1)    h_scattplot = darr_d_darr_darr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]<-1 && vtDen[vv]==1) h_scattplot = darr_d_iarr_d(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]==1)  h_scattplot = darr_d_darr_d(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]<-1)  h_scattplot = darr_d_darr_iarr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]>1 && vtDen[vv]>1)   h_scattplot = darr_d_darr_darr(sample_vars,tree,r,v,vv);
     //darr_darr
-    if(vtNum[v]>1 && vtDen[v]>1 && vtNum[vv]>1 && vtDen[vv]>1)     h_scattplot = darr_darr_darr_darr(sample_vars,tree,r,v,vv);
-    if(vtNum[v]>1 && vtDen[v]>1  && vtNum[vv]>1 && vtDen[vv]<-1)   h_scattplot = darr_darr_darr_iarr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]>1 && vtNum[vv]>1 && vtDen[vv]>1)    h_scattplot = darr_darr_darr_darr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]>1  && vtNum[vv]>1 && vtDen[vv]<-1)  h_scattplot = darr_darr_darr_iarr(sample_vars,tree,r,v,vv);
     //darr_iarr
-    if(vtNum[v]>1 && vtDen[v]<-1 && vtNum[vv]>1 && vtDen[vv]<-1)   h_scattplot = darr_iarr_darr_iarr(sample_vars,tree,r,v,vv);
-    if(vtNum[v]>1 && vtDen[v]<-1 && vtNum[vv]>1 && vtDen[vv]>1)    h_scattplot = darr_iarr_darr_darr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]<-1 && vtNum[vv]>1 && vtDen[vv]<-1)  h_scattplot = darr_iarr_darr_iarr(sample_vars,tree,r,v,vv);
+    if(vtNum[v]>1 && vtDen[v]<-1 && vtNum[vv]>1 && vtDen[vv]>1)   h_scattplot = darr_iarr_darr_darr(sample_vars,tree,r,v,vv);
     //double_double_double
     if(vtNum[v]==1 && vtDen[v]==1 && vtNum[vv]==1 && vtDen[vv]==1) h_scattplot = double_double_double_double(sample_vars,tree,r,v,vv);
     //darr_double_double
-    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]==1 && vtDen[vv]==1)  h_scattplot = darr_double_double_double(sample_vars,tree,r,v,vv);
-    if(vtNum[v])
+    if(vtNum[v]>1 && vtDen[v]==1 && vtNum[vv]==1 && vtDen[vv]==1) h_scattplot = darr_double_double_double(sample_vars,tree,r,v,vv);
+    //if(vtNum[v])
     drawscattplot(h_scattplot);
     //Take correlation values
     double d_corrval = h_scattplot->GetCorrelationFactor();
@@ -158,13 +164,13 @@ void CorrelationMatrix(){
     h_corrmat->SetBinContent(posv,posvv,d_corrval); 
     h_corrmat->GetXaxis()->SetBinLabel(posv,varTitles[v].c_str());
     h_corrmat->GetYaxis()->SetBinLabel(posvv,varTitles[vv].c_str());
-    const string sample_vars_pdf = "plots_CM/"+rootplas[r]+"___"+varTitlespdf[v]+"___"+varTitlespdf[vv];
+    const string sample_vars_pdf = "plots_IP1D_xyz/"+rootplas[r]+"___"+varTitlespdf[v]+"___"+varTitlespdf[vv];
     if(save_plots) c1->SaveAs((sample_vars_pdf+".pdf").c_str());
    } 
   }//Combinatoric of variables
   string s_corr    = corrmat+rootplas[r];
   TCanvas* c0 = new TCanvas(s_corr.c_str(),s_corr.c_str(),100,100,700,600);
-  c0->SaveAs(("plots_CM"+s_corr+".pdf").c_str());
+  c0->SaveAs(("plots_IP1D_xyz/"+s_corr+".pdf").c_str());
   drawcorrmat(h_corrmat);
  }//Loop on samples
 }
@@ -304,6 +310,7 @@ TH2F*  darr_d_darr_d(string sample_vars, TTree* tree, int r,int v,int vv){
  double varXDen;
  tree->SetBranchAddress(varNum[v].c_str(),&varXNum);
  tree->SetBranchAddress(varDen[v].c_str(),&varXDen);
+ //cout<<"jhandu Balm"<<endl;
  double wgt_lumi = 0; double wgt_pu = 0;
  //Fill histo
  double weight = 0.;
@@ -317,15 +324,18 @@ TH2F*  darr_d_darr_d(string sample_vars, TTree* tree, int r,int v,int vv){
   if(noLumiNorm) weight = 1.;
   if(noPUcorr)   wgt_pu = 1.;
   if(varNum[v]==varNum[vv] && varDen[v]==varDen[vv]){
-  cout<<"chagal"<<varXNum[abs(vtNum[v])-2];
+  //cout<<"chagal"<<varXNum[abs(vtNum[v])-2];
   h_scattplot->Fill(varXNum[abs(vtNum[v])-2]/double(varXDen),varXNum[abs(vtNum[vv])-2]/double(varXDen),weight*wgt_pu);
   }else if(varNum[v]!=varNum[vv] && varDen[v]==varDen[vv]){
    double    varYNum[100];
+   //cout<<"chala meri jaan"<<endl;
    tree->SetBranchAddress(varNum[vv].c_str(),&varYNum);
    //cout<<"the variable is "<<varNum[vv];
-   //cout<<"1st entry"<<varYNum[0]; 
-  h_scattplot->Fill(varXNum[abs(vtNum[v])-2]/double(varXDen),varYNum[abs(vtNum[vv])-2]/double(varXDen),weight*wgt_pu);
+   //cout<<"1st entry"<<varYNum[0];
+  //cout<<"ki chana ayen"<<fabs(varXNum[abs(vtNum[v])-2])/double(varXDen); 
+  h_scattplot->Fill(fabs(varXNum[abs(vtNum[v])-2])/double(varXDen),fabs(varYNum[abs(vtNum[vv])-2])/double(varXDen),weight*wgt_pu);
   }else{
+   //cout<<"chala ki labda"<<endl;
    int    varYNum[100];
    double varYDen;
    tree->SetBranchAddress(varNum[vv].c_str(),&varYNum);
@@ -533,14 +543,19 @@ TH2F*  double_double_double_double(string sample_vars, TTree* tree, int r,int v,
  vector<string> varDen(variablesDen, variablesDen + sizeof(variablesDen)/sizeof(variablesDen[0]));
  double varXNum;
  double varXDen;
+ //cout<<"panga is not changa"<<endl;
+ //cout<<"chagla"<<varNum[v]<<endl;
  tree->SetBranchAddress(varNum[v].c_str(),&varXNum);
+ //cout<<"zor ka jhtka "<<endl;
  tree->SetBranchAddress(varDen[v].c_str(),&varXDen);
+// cout<<"ye jo chilman hy "<<endl;
  double wgt_lumi = 0; double wgt_pu = 0;
  //Fill histo
  double weight = 0.;
  for(int en=0; en<tree->GetEntries(); en++)
  //for(int en=0; en<10; en++)
  {
+ //cout<<"suno na sang e marmar "<<endl;
  tree->GetEntry(en);
  weight = wgt_lumi;
  weight = weight*Luminosity/100.;
@@ -574,7 +589,7 @@ TH2F*  double_double_double_double(string sample_vars, TTree* tree, int r,int v,
  tree->SetBranchAddress(varNum[v].c_str(),&varXNum);
  tree->SetBranchAddress(varDen[v].c_str(),&varXDen);
  double wgt_lumi = 0; double wgt_pu = 0;
- double weight = 0.;
+double weight = 0.;
  for(int en=0; en<tree->GetEntries(); en++)
  //for(int en=0; en<10;en++)
  {
@@ -586,10 +601,12 @@ TH2F*  double_double_double_double(string sample_vars, TTree* tree, int r,int v,
  if(noPUcorr)   wgt_pu = 1.;
  double varYNum;
  double varYDen;
+ //cout<<"which variable aya"<<varNum[v]<<"the other one is"<<varDen[v]<<endl;
  tree->SetBranchAddress(varNum[vv].c_str(),&varYNum);
  tree->SetBranchAddress(varDen[vv].c_str(),&varYDen);
+ //cout<<"this should be csv"<<varNum[vv]<<"and "<<varDen[vv]<<endl;
  h_scattplot->Fill(varXNum[abs(vtNum[v])-2]/double(varXDen),varYNum/double(varYDen),weight*wgt_pu);
- }
+   }
  return h_scattplot;
 }
 
@@ -636,7 +653,7 @@ TH2F* emptyhisto(string sample_vars,int r,int v,int vv){
  vector<string> varTitles(titles, titles + sizeof(titles)/sizeof(titles[0]));
  TH2F* h_scattplot = new TH2F(sample_vars.c_str(),sample_vars.c_str(),bin[v],inRange[v],endRange[v],bin[vv],inRange[vv],endRange[vv]);
  string titleY;
- if(r==0) titleY = "Light flavour Jets";
+ if(r==0) titleY = "Light Flavor Jets";
  if(r==1) titleY = "b Jets";
  h_scattplot->SetTitle(titleY.c_str());
  h_scattplot->SetMarkerStyle(10);
@@ -659,7 +676,7 @@ void setTDRStyle(){
   tdrStyle->SetCanvasBorderMode(0);
   tdrStyle->SetCanvasColor(kWhite);
   tdrStyle->SetCanvasDefH(600); //Height of canvas
-  tdrStyle->SetCanvasDefW(600); //Width of canvas
+  tdrStyle->SetCanvasDefW(800); //Width of canvas
   tdrStyle->SetCanvasDefX(0);   //POsition on screen
   tdrStyle->SetCanvasDefY(0);
   // For the Pad:
